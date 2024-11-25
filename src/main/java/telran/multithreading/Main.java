@@ -6,57 +6,61 @@ import telran.view.Menu;
 import telran.view.StandardInputOutput;
 
 public class Main {
-    private static Race race;
-    private static Racer[] racers;
+    private static final int MAX_THREADS = 10;
+    private static final int MIN_THREADS = 2;
+    private static final int MIN_DISTANCE = 100;
+    private static final int MAX_DISTANCE = 3500;
+    private static final int MIN_SLEEP = 2;
+    private static final int MAX_SLEEP = 5;
 
     public static void main(String[] args) {
         InputOutput io = new StandardInputOutput();
-        Menu menu = new Menu("RACING GAME", getMenuItems(io));
+        Item[] items = getItems();
+        Menu menu = new Menu("Race Game", items);
         menu.perform(io);
     }
 
-    private static Item[] getMenuItems(InputOutput io) {
-        return new Item[] {
-                Item.of("Set race parameters", i -> setRaceParameters(io)),
-                Item.of("Start race!!!", i -> startRace(io)),
-                Item.ofExit()
+    private static Item[] getItems() {
+        Item[] res = {
+            Item.of("Start new game", Main::startGame),
+            Item.ofExit()
         };
+        return res;
     }
 
-    private static void setRaceParameters(InputOutput io) {
-        int nRacers = io.readNumberRange("Enter number of racers (1 - 10000):", "Invalid number of racers", 1, 10000)
-                .intValue();
-        int distance = io.readNumberRange("Enter race distance (number of iterations (1 - 10000)):", "Invalid distance",
-                1, 10000).intValue();
-        int minSleepTime = io.readNumberRange("Enter min sleep time, ms (1 - 1000):", "Invalid sleep time", 1, 1000)
-                .intValue();
-        int maxSleepTime = io.readNumberRange("Enter max sleep time, ms (min sleep time - 5000):", "Invalid sleep time",
-                minSleepTime, 5000).intValue();
-
-        race = new Race(distance, minSleepTime, maxSleepTime);
-        racers = new Racer[nRacers];
-        Racer.setRacers(racers);
-        io.writeLine("Race parameters were installed.");
+    static void startGame(InputOutput io) {
+        int nThreads = io.readNumberRange("Enter number of the racers", "Wrong number of the racers",
+                MIN_THREADS, MAX_THREADS).intValue();
+        int distance = io.readNumberRange("Enter distance", "Wrong Distance", MIN_DISTANCE, MAX_DISTANCE).intValue();
+        Race race = new Race(distance, MIN_SLEEP, MAX_SLEEP);
+        Racer[] racers = new Racer[nThreads];
+        startRacers(racers, race);
+        joinRacers(racers);
+        displayResults(race);
     }
 
-    private static void startRace(InputOutput io) {
-        if (race == null || racers == null) {
-            io.writeLine("Please set race parameters first.");
-            return;
+    private static void displayResults(Race race) {
+        System.out.println("Place\tRacer Number\tRunning Time (ms)");
+        System.out.println("............................................");
+        for (Result result : race.getResults()) {
+            System.out.println(result);
         }
+    }
 
+    private static void joinRacers(Racer[] racers) {
+        for (int i = 0; i < racers.length; i++) {
+            try {
+                racers[i].join();
+            } catch (InterruptedException e) {
+                
+            }
+        }
+    }
+
+    private static void startRacers(Racer[] racers, Race race) {
         for (int i = 0; i < racers.length; i++) {
             racers[i] = new Racer(race, i + 1);
             racers[i].start();
         }
-
-        while (Racer.getWinner() == 0) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                break;
-            }
-        }
-        io.writeLine("All racers have finished. Thanks for watching the race!");
     }
 }

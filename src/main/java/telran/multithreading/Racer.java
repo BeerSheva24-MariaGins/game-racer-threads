@@ -1,53 +1,40 @@
 package telran.multithreading;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Random;
 
 public class Racer extends Thread {
     private Race race;
     private int number;
-    private static AtomicInteger winner = new AtomicInteger(0);
-    private static Racer[] racers;
+    private static int position = 1;
 
     public Racer(Race race, int number) {
         this.race = race;
         this.number = number;
-        this.setDaemon(true);
-    }
-
-    public static void setRacers(Racer[] racers) {
-        Racer.racers = racers;
-    }
-
-    public static int getWinner() {
-        return winner.get();
     }
 
     @Override
     public void run() {
-        for (int i = 0; i < race.getDistance(); i++) {
-            if (winner.get() > 0) {
-                return;
-            }
+        int minSleep = race.getMinSleep();
+        int maxSleep = race.getMaxSleep();
+        int distance = race.getDistance();
+        Random random = new Random();
+
+        for (int i = 0; i < distance; i++) {
             try {
-                Thread.sleep(race.getRandomSleepTime());
+                sleep(random.nextInt(minSleep, maxSleep + 1));
+                System.out.printf("%d - step %d\n", number, i);
             } catch (InterruptedException e) {
-                return;
-            }
-            System.out.printf("Racer %d is at iteration %d%n", number, i + 1);
-        }
-
-        if (winner.compareAndSet(0, number)) {
-            System.out.printf("Congratulations to Racer %d - winner!%n", number);
-
-            stopAllRacers();
-        }
-    }
-
-    private void stopAllRacers() {
-        for (Racer racer : racers) {
-            if (racer != null && racer != this) {
-                racer.interrupt();
+                
             }
         }
+
+        long endTime = System.currentTimeMillis(); 
+        long runningTime = endTime - race.getStartTime(); 
+
+        synchronized (Race.class) {
+            race.addResult(new Result(position++, number, runningTime));
+        }
+
+        race.winner.compareAndSet(-1, number);
     }
 }
