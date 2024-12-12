@@ -1,53 +1,52 @@
 package telran.multithreading;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Instant;
+import java.util.Random;
 
 public class Racer extends Thread {
-    private Race race;
-    private int number;
-    private static AtomicInteger winner = new AtomicInteger(0);
-    private static Racer[] racers;
+	private Race race;
+	private int number;
+	private Instant finishTime;
 
-    public Racer(Race race, int number) {
-        this.race = race;
-        this.number = number;
-        this.setDaemon(true);
-    }
+	public Racer(Race race, int number) {
+		this.race = race;
+		this.number = number;
+	}
 
-    public static void setRacers(Racer[] racers) {
-        Racer.racers = racers;
-    }
+	@Override
+	public void run() {
+		int minSleep = race.getMinSleep();
+		int maxSleep = race.getMaxSleep();
+		int distance = race.getDistance();
+		Random random = new Random();
+		for (int i = 0; i < distance; i++) {
+			try {
+				sleep(random.nextInt(minSleep, maxSleep + 1));
+				System.out.printf("%d - step %d\n", number, i);
+			} catch (InterruptedException e) {
+			}
+		}
+		try {
+			race.lock.lock();
+			finishTime = Instant.now();
+			finishRace();
 
-    public static int getWinner() {
-        return winner.get();
-    }
+		} finally {
+			race.lock.unlock();
+		}
+	}
 
-    @Override
-    public void run() {
-        for (int i = 0; i < race.getDistance(); i++) {
-            if (winner.get() > 0) {
-                return;
-            }
-            try {
-                Thread.sleep(race.getRandomSleepTime());
-            } catch (InterruptedException e) {
-                return;
-            }
-            System.out.printf("Racer %d is at iteration %d%n", number, i + 1);
-        }
+	private void finishRace() {
+		race.getResultsTable().add(this);
 
-        if (winner.compareAndSet(0, number)) {
-            System.out.printf("Congratulations to Racer %d - winner!%n", number);
+	}
 
-            stopAllRacers();
-        }
-    }
+	public Instant getFinsishTime() {
+		return finishTime;
 
-    private void stopAllRacers() {
-        for (Racer racer : racers) {
-            if (racer != null && racer != this) {
-                racer.interrupt();
-            }
-        }
-    }
+	}
+
+	public int getNumber() {
+		return number;
+	}
 }

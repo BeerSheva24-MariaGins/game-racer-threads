@@ -1,62 +1,81 @@
 package telran.multithreading;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.stream.IntStream;
 
-import telran.view.InputOutput;
-import telran.view.Item;
-import telran.view.Menu;
-import telran.view.StandardInputOutput;
-
-public class Main {
-    private static Race race;
-    private static Racer[] racers;
-
+import telran.view.*;
+public class Main { 
+    private static final int MAX_THREADS = 20;
+    private static final int MIN_THREADS = 2;
+    private static final int MIN_DISTANCE = 100;
+    private static final int MAX_DISTANCE = 3500;
+    private static final int MIN_SLEEP = 2;
+    private static final int MAX_SLEEP = 5;
     public static void main(String[] args) {
-        InputOutput io = new StandardInputOutput();
-        Menu menu = new Menu("RACING GAME", getMenuItems(io));
-        menu.perform(io);
-    }
-
-    private static Item[] getMenuItems(InputOutput io) {
-        return new Item[] {
-                Item.of("Set race parameters", i -> setRaceParameters(io)),
-                Item.of("Start race!!!", i -> startRace(io)),
-                Item.ofExit()
-        };
-    }
-
-    private static void setRaceParameters(InputOutput io) {
-        int nRacers = io.readNumberRange("Enter number of racers (1 - 10000):", "Invalid number of racers", 1, 10000)
-                .intValue();
-        int distance = io.readNumberRange("Enter race distance (number of iterations (1 - 10000)):", "Invalid distance",
-                1, 10000).intValue();
-        int minSleepTime = io.readNumberRange("Enter min sleep time, ms (1 - 1000):", "Invalid sleep time", 1, 1000)
-                .intValue();
-        int maxSleepTime = io.readNumberRange("Enter max sleep time, ms (min sleep time - 5000):", "Invalid sleep time",
-                minSleepTime, 5000).intValue();
-
-        race = new Race(distance, minSleepTime, maxSleepTime);
-        racers = new Racer[nRacers];
-        Racer.setRacers(racers);
-        io.writeLine("Race parameters were installed.");
-    }
-
-    private static void startRace(InputOutput io) {
-        if (race == null || racers == null) {
-            io.writeLine("Please set race parameters first.");
-            return;
+       
+            InputOutput io = new StandardInputOutput();
+            Item[] items = getItems();
+            Menu menu = new Menu("Race Game", items);
+            menu.perform(io);
+    
         }
-
-        for (int i = 0; i < racers.length; i++) {
-            racers[i] = new Racer(race, i + 1);
-            racers[i].start();
+    
+        private static Item[] getItems() {
+            Item[] res = {
+                    Item.of("Start new game", Main::startGame),
+                    Item.ofExit()
+            };
+            return res;
         }
+        static void startGame(InputOutput io) {
+            int nThreads = io.readNumberRange("Enter number of the racers","Wrong number of the racers",
+                    MIN_THREADS, MAX_THREADS).intValue();
+            int distance = io.readNumberRange("Enter distance", 
+            "Wrong Distance",MIN_DISTANCE, MAX_DISTANCE).intValue();
+            Race race = new Race(distance, MIN_SLEEP, MAX_SLEEP, new ArrayList<Racer>(), Instant.now());
+            Racer[] racers = new Racer[nThreads];
+            startRacers(racers, race);
+            joinRacers(racers);
+           displayResultsTable(race);
+        }
+    private static void displayResultsTable(Race race) {
+		System.out.println("place\tracer number\ttime");
+		ArrayList<Racer> resultsTable = race.getResultsTable();
+		IntStream.range(0, resultsTable.size()).mapToObj(i ->  toPrintedString(i, race))
+		.forEach(System.out::println);
+		
+		
+		
+		
+	}
+	private static String toPrintedString(int index, Race race) {
+		Racer runner = race.getResultsTable().get(index);
+		return String.format("%3d\t%7d\t\t%d", index + 1, runner.getNumber(),
+				ChronoUnit.MILLIS.between(race.getStartTime(), runner.getFinsishTime()));
+	}
 
-        while (Racer.getWinner() == 0) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                break;
+        
+    
+        private static void joinRacers(Racer[] racers)  {
+            for(int i = 0; i < racers.length; i++) {
+                try {
+                    racers[i].join();
+                } catch (InterruptedException e) {
+                    
+                }
             }
+            
+            
         }
-        io.writeLine("All racers have finished. Thanks for watching the race!");
-    }
+    
+        private static void startRacers(Racer[] racers, Race race) {
+            for(int i = 0; i < racers.length; i++) {
+                racers[i] = new Racer(race, i + 1);
+                racers[i].start();
+            }
+            
+            
+        }
+    
 }
